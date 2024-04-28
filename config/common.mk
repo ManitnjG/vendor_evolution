@@ -1,8 +1,8 @@
 # Allow vendor/extra to override any property by setting it first
 $(call inherit-product-if-exists, vendor/extra/product.mk)
-
-# Enable support for APEX updates
-$(call inherit-product, $(SRC_TARGET_DIR)/product/updatable_apex.mk)
+$(call inherit-product-if-exists, vendor/pixel-framework/config.mk)
+$(call inherit-product-if-exists, vendor/certification/config.mk)
+$(call inherit-product-if-exists, vendor/microsoft/packages.mk)
 
 PRODUCT_BRAND ?= EvolutionX
 
@@ -155,13 +155,24 @@ PRODUCT_SYSTEM_PROPERTIES += \
     persist.sys.max_profiles=16 \
     fw.max_users=32
 
-# Do not include art debug targets
+# Don't build debug for host or device
+ifeq ($(TARGET_BUILD_VARIANT), user)
 PRODUCT_ART_TARGET_INCLUDE_DEBUG_BUILD := false
-
-# Strip the local variable table and the local variable type table to reduce
-# the size of the system image. This has no bearing on stack traces, but will
-# leave less information available via JDWP.
 PRODUCT_MINIMIZE_JAVA_DEBUG_INFO := true
+PRODUCT_SYSTEM_SERVER_DEBUG_INFO := false
+WITH_DEXPREOPT_DEBUG_INFO := false
+ART_BUILD_TARGET_NDEBUG := false
+ART_BUILD_TARGET_DEBUG := false
+ART_BUILD_HOST_NDEBUG := false
+ART_BUILD_HOST_DEBUG := false
+USE_DEX2OAT_DEBUG := false
+endif
+
+# Disable debug infos
+ifeq ($(TARGET_BUILD_VARIANT), user)
+PRODUCT_SYSTEM_EXT_PROPERTIES += \
+    dalvik.vm.dex2oat-minidebuginfo=false
+endif
 
 # Enable whole-program R8 Java optimizations for SystemUI and system_server,
 # but also allow explicit overriding for testing and development.
@@ -202,7 +213,24 @@ PRODUCT_PACKAGES += \
     zstd
 
 # Evolution X customization
+TARGET_USES_LEGACY_BOOTANIMATION ?= false
+TARGET_SUPPORTS_QUICK_TAP ?= false
+
+# Gapps flags
+TARGET_USES_MINI_GAPPS ?= false
+TARGET_USES_PICO_GAPPS ?= false
+
+# Pixel-specific flags
 TARGET_IS_PIXEL ?= false
+ifneq ($(filter $(EVOLUTION_BUILD),$(shell cat vendor/evolution/vars/pixels | grep '  ')),)
+TARGET_IS_PIXEL := true
+endif
+
+ifeq ($(TARGET_IS_PIXEL),true)
+DISABLE_ARTIFACT_PATH_REQUIREMENTS := true
+PRODUCT_USE_SCUDO := true
+endif
+
 TARGET_IS_PIXEL_6 ?= false
 TARGET_IS_PIXEL_7 ?= false
 TARGET_IS_PIXEL_7A ?= false
@@ -210,16 +238,9 @@ TARGET_IS_PIXEL_8 ?= false
 TARGET_IS_PIXEL_FOLD ?= false
 TARGET_IS_PIXEL_TABLET ?= false
 TARGET_PIXEL_STAND_SUPPORTED ?= false
-TARGET_SUPPORTS_QUICK_TAP ?= false
-TARGET_USES_LEGACY_BOOTANIMATION ?= false
-TARGET_USES_MINI_GAPPS ?= false
-TARGET_USES_PICO_GAPPS ?= false
 
 # Face Unlock
 ifeq ($(TARGET_SUPPORTS_64_BIT_APPS),true)
-TARGET_FACE_UNLOCK_SUPPORTED ?= true
-
-ifeq ($(TARGET_FACE_UNLOCK_SUPPORTED),true)
 PRODUCT_PACKAGES += \
     ParanoidSense
 
@@ -228,7 +249,6 @@ PRODUCT_SYSTEM_EXT_PROPERTIES += \
 
 PRODUCT_COPY_FILES += \
     frameworks/native/data/etc/android.hardware.biometrics.face.xml:$(TARGET_COPY_OUT_SYSTEM)/etc/permissions/android.hardware.biometrics.face.xml
-endif
 endif
 
 # Dex preopt
@@ -274,10 +294,7 @@ else ifneq ($(TARGET_USES_LEGACY_BOOTANIMATION), true)
 $(call inherit-product, vendor/evolution/config/bootanimation.mk)
 endif
 
-# Certification
-$(call inherit-product-if-exists, vendor/certification/config.mk)
-
-# Clocks
+# Inherit from clocks config
 $(call inherit-product, vendor/evolution/config/clocks.mk)
 
 # Inherit from fonts config
@@ -298,10 +315,7 @@ $(call inherit-product, vendor/evolution/config/textclassifier.mk)
 # Inherit from themes config
 $(call inherit-product, vendor/evolution/config/themes.mk)
 
-# Inherit from our version config
+# Inherit from version config
 $(call inherit-product, vendor/evolution/config/version.mk)
-
-# Pixel Framework
-$(call inherit-product-if-exists, vendor/pixel-framework/config.mk)
 
 -include $(WORKSPACE)/build_env/image-auto-bits.mk
